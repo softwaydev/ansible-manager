@@ -1,10 +1,11 @@
 import os
 import signal
+import sys
 import traceback
+from select import select
+from subprocess import Popen, PIPE
 from time import sleep
 from multiprocessing import Process
-import asyncio
-from asyncio.subprocess import PIPE, create_subprocess_shell
 
 from django.conf import settings
 
@@ -71,20 +72,31 @@ class TaskManager:
         )
 
         try:
-            loop = asyncio.get_event_loop()
+            proc = Popen(shell_command, shell=True, stdout=PIPE, stderr=PIPE, cwd=cwd)
 
-            create_proc = create_subprocess_shell(shell_command, stdout=PIPE, stderr=PIPE, cwd=cwd)
-            proc = loop.run_until_complete(create_proc)
+            readable = {
+                proc.stdout.fileno(): sys.stdout.buffer,
+                proc.stderr.fileno(): sys.stderr.buffer,
+            }
+            while readable:
+                for fd in select(readable, [], [])[0]:
+                    data = os.read(fd, 1024)
+                    if not data:
+                        del readable[fd]
+                    else:
+                        if fd == proc.stdout.fileno():
+                            task.logs.create(
+                                status=consts.IN_PROGRESS,
+                                output=data.decode('utf-8'),
+                            )
+                        elif fd == proc.stderr.fileno():
+                            task.logs.create(
+                                status=consts.FAIL,
+                                output=data.decode('utf-8'),
+                            )
 
-            tasks = [
-                proc.wait(),
-                cls._log_output(task, proc.stdout, consts.IN_PROGRESS),
-                cls._log_output(task, proc.stderr, consts.FAIL),
-            ]
-            loop.run_until_complete(asyncio.wait(tasks))
-
-            code = proc.returncode
-            if code == 0:
+            proc.communicate()
+            if proc.returncode == 0:
                 task.logs.create(
                     status=consts.COMPLETED,
                     message='Completed.'
@@ -94,7 +106,7 @@ class TaskManager:
             else:
                 task.logs.create(
                     status=consts.FAIL,
-                    message='Failed with status code %s' % code
+                    message='Failed with status code %s' % proc.returncode
                 )
                 task.status = consts.FAIL
                 task.save()
@@ -157,15 +169,3 @@ class TaskManager:
     @staticmethod
     def _is_process_run(pid):
         return os.path.exists("/proc/%s" % pid)
-
-    @staticmethod
-    async def _log_output(task, stream, status):
-        while True:
-            output = await stream.readline()
-            if not output:
-                return
-
-            task.logs.create(
-                status=status,
-                output=output,
-            )
