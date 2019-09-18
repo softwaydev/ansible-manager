@@ -16,6 +16,9 @@ class Ansible(TestCase):
             name='Test_name',
             value='Test_var'
         )
+        empty_host_group = models.HostGroup.objects.create(
+            name="Empty test host_group",
+        )
         host_group = models.HostGroup.objects.create(
             name='Test host_group',
         )
@@ -52,6 +55,13 @@ class Ansible(TestCase):
         task.hosts.add(host)
         task.hosts.add(other_host)
         task.vars.add(var)
+        task2 = models.Task.objects.create(
+            playbook="/home2/",
+            template=task_template,
+            user=self.user,
+            ansible_user=ansible_user,
+        )
+#        task2.host_groups.add(empty_host_group)
 
     @mock.patch('core.datatools.ansible.create_inventory')
     def test_make_command(self, create_inventory_mock):
@@ -66,18 +76,11 @@ class Ansible(TestCase):
     def test_create_inventory(self, tempfile_mock):
         test_path_tempfile = '/tmp/test'
         tempfile_mock.return_value = test_path_tempfile
+        if os.path.exists(test_path_tempfile):
+            shutil.rmtree(test_path_tempfile)
         os.mkdir(test_path_tempfile)
 
-        self.assertEqual(ansible.create_inventory(models.Task.objects.get(playbook='/home/')),
-                         test_path_tempfile + '/inventory')
-        f = open(test_path_tempfile + '/inventory', 'r')
-        inventory_file_content = ' '.join(''.join(f.read().split('\n')).split(' '))
-
-        must_be_inventory_file_content = '192.168.59.44  Test_name=Test_var 192.168.128.20  Test_name=Test_var '
-
-        self.assertEqual(inventory_file_content, must_be_inventory_file_content)
-
-        f.close()
+        self.assertRaises(Exception, ansible.create_inventory, models.Task.objects.get(playbook='/home2/'))
         shutil.rmtree(test_path_tempfile)
 
     def test_inventory_file_path(self):

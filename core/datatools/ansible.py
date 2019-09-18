@@ -46,7 +46,10 @@ def create_inventory(task) -> str:
 
     hosts = set(task.hosts.all())
     for group in task.host_groups.all():
-        hosts.update(group.hosts.all())
+        group_hosts = group.hosts.all()
+        hosts.update(group_hosts)
+    if not hosts:
+        raise Exception("ERROR! Empty hosts!")
 
     hosts_vars = {}
     # base - host vars
