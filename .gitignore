@@ -4,3 +4,5 @@ project/local_settings.py
 *.pyc
 node_modules
 venv/
+htmlcov/
+.coverage

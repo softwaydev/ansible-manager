@@ -42,14 +42,13 @@ def make_command(task) -> str:
 def create_inventory(task) -> str:
     assert hasattr(task, 'hosts')
     assert hasattr(task, 'host_groups')
+    assert hosts, 'Empty hosts!'
     # assert hasattr(task, 'vars')
 
     hosts = set(task.hosts.all())
     for group in task.host_groups.all():
         group_hosts = group.hosts.all()
         hosts.update(group_hosts)
-    if not hosts:
-        raise Exception("ERROR! Empty hosts!")
 
     hosts_vars = {}
     # base - host vars
