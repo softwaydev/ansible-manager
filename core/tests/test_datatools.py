@@ -145,6 +145,12 @@ class Tasks(TestCase):
             ansible_user=an_user,
         )
 
+        host = models.Host.objects.create(
+            name='Test host',
+            address='192.168.59.44',
+        )
+        task.hosts.add(host)
+
         task_manager = tasks.TaskManager()
         task_manager.run_task(task.id)
 

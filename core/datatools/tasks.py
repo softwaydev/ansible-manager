@@ -55,23 +55,23 @@ class TaskManager:
         from django.db import connection
         connection.connection.close()
         connection.connection = None
-
+        inventory_file_path = None
         task = models.Task.objects.get(id=task_id)
 
-        shell_command = task.get_ansible_command()
-        inventory_file_path = core.datatools.ansible.get_inventory_file_path(shell_command)
-        task.logs.create(
-            status=consts.IN_PROGRESS,
-            message='Command: %s' % shell_command,
-        )
-
-        cwd = settings.ANSIBLE_WORK_DIR
-        task.logs.create(
-            status=consts.IN_PROGRESS,
-            message='Working directory: %s' % cwd,
-        )
-
         try:
+            shell_command = task.get_ansible_command()
+            inventory_file_path = core.datatools.ansible.get_inventory_file_path(shell_command)
+            task.logs.create(
+                status=consts.IN_PROGRESS,
+                message='Command: %s' % shell_command,
+            )
+
+            cwd = settings.ANSIBLE_WORK_DIR
+            task.logs.create(
+                status=consts.IN_PROGRESS,
+                message='Working directory: %s' % cwd,
+            )
+
             proc = Popen(shell_command, shell=True, stdout=PIPE, stderr=PIPE, cwd=cwd)
 
             readable = {
@@ -121,7 +121,7 @@ class TaskManager:
                 status=consts.FAIL
             )
         finally:
-            if not task.inventory:
+            if not task.inventory and inventory_file_path:
                 os.remove(inventory_file_path)
             if os.path.exists("/proc/%s" % task.pid):
                 os.kill(task.pid, signal.SIGTERM)
