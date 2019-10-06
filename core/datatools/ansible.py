@@ -40,25 +40,18 @@ def make_command(task) -> str:
 
 
 def create_inventory(task) -> str:
-    assert hasattr(task, 'hosts')
-    assert hasattr(task, 'host_groups')
-    # assert hasattr(task, 'vars')
-
     hosts = set(task.hosts.all())
     for group in task.host_groups.all():
-        hosts.update(group.hosts.all())
+        group_hosts = group.hosts.all()
+        hosts.update(group_hosts)
+
+    assert hosts, 'Empty hosts!'
 
     hosts_vars = {}
-    # base - host vars
+
     for host in hosts:
         hosts_vars[host] = {var.name: var for var in host.get_vars()}
 
-    # # higher priority - task vars
-    # for var in task.vars.all():
-    #     for host in hosts_vars.keys():
-    #         hosts_vars[host][var.name] = var
-
-    # sort vars by name
     for host, host_vars in hosts_vars.items():
         hosts_vars[host] = sorted(host_vars.values(), key=lambda v: v.name)
 
